@@ -1,4 +1,4 @@
-import { ASTNode, ASTNullNode, ASTNumberNode, ASTObjectNode, ASTStringNode, ASTUndefinedNode } from '../ast';
+import { ASTArrayNode, ASTNullNode, ASTNumberNode, ASTObjectNode, ASTStringNode, ASTUndefinedNode } from '../ast';
 import { ASTBooleanNode } from '../ast/ast-boolean.node';
 import { TokenType } from '../enums';
 import { IJsonParser, IToken } from '../interfaces';
@@ -13,6 +13,10 @@ export class JSONParser implements IJsonParser {
         let currentToken = tokenizer.getNextToken();
         let value;
 
+        if (currentToken.type !== TokenType.LEFT_BRACE) {
+            throw new Error('Expected object');
+        }
+
         while (currentToken.type !== TokenType.EOF) {
             value = this.parseValueBaseOnType(currentToken, tokenizer);
             currentToken = tokenizer.getNextToken();
@@ -26,7 +30,7 @@ export class JSONParser implements IJsonParser {
             case TokenType.LEFT_BRACE:
                 return this.parseObject(currentToken, tokenizer);
             case TokenType.LEFT_BRACKET:
-                return this.parseArray(currentToken);
+                return this.parseArray(currentToken, tokenizer);
             case TokenType.STRING:
                 return this.parseString(currentToken);
             case TokenType.NUMBER:
@@ -68,6 +72,26 @@ export class JSONParser implements IJsonParser {
         return newASTObjectNode;
     }
 
+    public parseArray(currentToken: IToken, tokenizer: JSONTokenizer) {
+        const newASTArrayNode = new ASTArrayNode();
+
+        while (currentToken.type !== TokenType.RIGHT_BRACKET) {
+            currentToken = tokenizer.getNextToken();
+            if (currentToken.type === TokenType.RIGHT_BRACKET) {
+                break;
+            }
+
+            if (currentToken.type === TokenType.COMMA) {
+                continue;
+            }
+
+            const value = this.parseValue(currentToken, tokenizer);
+            newASTArrayNode.push(value);
+        }
+
+        return newASTArrayNode;
+    }
+
     private parseKey(currentToken: IToken) {
         if (currentToken.type !== TokenType.STRING) {
             new Error('Expected string as a key');
@@ -86,8 +110,6 @@ export class JSONParser implements IJsonParser {
     private parseValue(currentToken: IToken, tokenizer: JSONTokenizer) {
         return this.parseValueBaseOnType(currentToken, tokenizer);
     }
-
-    public parseArray(currentToken: IToken) {}
 
     public parseNumber(currentToken: IToken) {
         if (currentToken.type !== TokenType.NUMBER || !TypeUtils.isNumber(currentToken.value)) {
